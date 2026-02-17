@@ -49,13 +49,58 @@ export default function SummarySheet({ data, result, updateField, updateParty, a
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard label="Гласало" value={result.totalVoted.toLocaleString("sr")} sub={`${result.percentVoted.toFixed(2)}%`} />
-        <StatCard label="У кутији" value={result.totalInBox.toLocaleString("sr")} sub={`${((result.totalInBox / result.totalVoted) * 100).toFixed(2)}%`} />
-        <StatCard label="Неважећи" value={result.totalInvalid.toLocaleString("sr")} sub={`${((result.totalInvalid / result.totalVoted) * 100).toFixed(2)}%`} />
-        <StatCard label="Важећи" value={result.totalValid.toLocaleString("sr")} sub={`${((result.totalValid / result.totalVoted) * 100).toFixed(2)}%`} />
-        <StatCard label="Бир. места" value={`${data.totalMandates} од ${data.totalMandates}`} />
+      {/* Voting stats - editable */}
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        <div className="bg-table-header px-5 py-3">
+          <h2 className="text-sm font-semibold text-table-header-foreground uppercase tracking-wider">
+            Подаци о гласању
+          </h2>
+        </div>
+        <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Гласали</label>
+            <input
+              type="number"
+              className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              value={data.totalVoted}
+              onChange={e => updateField("totalVoted", Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground mt-1">{data.totalVoters > 0 ? ((data.totalVoted / data.totalVoters) * 100).toFixed(2) : 0}% од бирача</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">У кутији</label>
+            <input
+              type="number"
+              className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              value={data.totalInBox}
+              onChange={e => updateField("totalInBox", Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground mt-1">{data.totalVoted > 0 ? ((data.totalInBox / data.totalVoted) * 100).toFixed(2) : 0}%</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Неважећи</label>
+            <input
+              type="number"
+              className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              value={data.totalInvalid}
+              onChange={e => updateField("totalInvalid", Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground mt-1">{data.totalInBox > 0 ? ((data.totalInvalid / data.totalInBox) * 100).toFixed(2) : 0}%</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Важећи</label>
+            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg font-bold">
+              {result.totalValid.toLocaleString("sr")}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">У кутији − Неважећи</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Бир. места</label>
+            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg">
+              {data.totalMandates} од {data.totalMandates}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Parties table */}

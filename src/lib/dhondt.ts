@@ -9,6 +9,9 @@ export interface ElectionData {
   municipality: string;
   totalVoters: number;
   totalMandates: number;
+  totalVoted: number;
+  totalInBox: number;
+  totalInvalid: number;
   parties: Party[];
 }
 
@@ -26,17 +29,12 @@ export interface DhondtResult {
 }
 
 export function calculateDhondt(data: ElectionData): DhondtResult {
-  const { parties, totalMandates, totalVoters } = data;
+  const { parties, totalMandates, totalVoters, totalVoted, totalInBox, totalInvalid } = data;
   
-  const totalVoted = parties.reduce((sum, p) => sum + p.votes, 0);
-  // Simulate: glasali can be slightly more than valid votes
-  const totalValid = totalVoted;
-  const totalInvalid = Math.round(totalVoted * 0.0046);
-  const totalInBox = totalValid + totalInvalid;
-  const totalVotedWithInvalid = totalInBox;
-  const percentVoted = (totalVotedWithInvalid / totalVoters) * 100;
+  const totalValid = totalInBox - totalInvalid;
+  const percentVoted = totalVoters > 0 ? (totalVoted / totalVoters) * 100 : 0;
 
-  const partyPercentages = parties.map(p => (p.votes / totalValid) * 100);
+  const partyPercentages = parties.map(p => totalValid > 0 ? (p.votes / totalValid) * 100 : 0);
 
   // Calculate quotients
   const quotients: number[][] = parties.map((party) => {
@@ -79,7 +77,7 @@ export function calculateDhondt(data: ElectionData): DhondtResult {
     mandates,
     mandateMatrix,
     thresholdQuotient,
-    totalVoted: totalVotedWithInvalid,
+    totalVoted,
     totalInBox,
     totalInvalid,
     totalValid,
@@ -92,6 +90,9 @@ export const defaultElectionData: ElectionData = {
   municipality: "АРАНЂЕЛОВАЦ",
   totalVoters: 36763,
   totalMandates: 41,
+  totalVoted: 26000,
+  totalInBox: 25880,
+  totalInvalid: 120,
   parties: [
     { name: "СНС", votes: 15000, isMinority: false, minorityCoefficient: 1 },
     { name: "Блокадери", votes: 8000, isMinority: false, minorityCoefficient: 1 },
