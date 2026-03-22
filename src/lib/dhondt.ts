@@ -78,7 +78,7 @@ export function calculateDhondt(data: ElectionData): DhondtResult {
 
 export const defaultElectionData: ElectionData = {
   municipality: "АРАНЂЕЛОВАЦ",
-  totalVoters: 36763,
+  totalVoters: 36841,
   totalMandates: 41,
   totalVoted: 0,
   totalInBox: 0,
