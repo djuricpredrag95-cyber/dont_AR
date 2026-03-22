@@ -1,4 +1,5 @@
-import { forwardRef, useMemo, useState } from "react";
+import { forwardRef, useMemo, useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
@@ -6,6 +7,14 @@ import DhondtSheet from "@/components/DhondtSheet";
 const Index = forwardRef<HTMLDivElement>((_, ref) => {
   const [activeTab, setActiveTab] = useState<"summary" | "dhondt">("summary");
   const [data, setData] = useState<ElectionData>(defaultElectionData);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.electionData) {
+      setData(location.state.electionData);
+    }
+  }, [location.state]);
 
   const result = useMemo(() => calculateDhondt(data), [data]);
 
@@ -39,7 +48,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
 
   return (
     <div ref={ref} className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-card px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div>
@@ -50,32 +58,39 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
               Распоред мандата — {data.municipality}
             </p>
           </div>
-          <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab("summary")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                activeTab === "summary"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              onClick={() => navigate("/unos")}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity"
             >
-              📊 Преглед
+              📝 Унос по БМ
             </button>
-            <button
-              onClick={() => setActiveTab("dhondt")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                activeTab === "dhondt"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              🔢 Д'Онт обрачун
-            </button>
+            <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab("summary")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  activeTab === "summary"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                📊 Преглед
+              </button>
+              <button
+                onClick={() => setActiveTab("dhondt")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  activeTab === "dhondt"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                🔢 Д'Онт обрачун
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-[1400px] mx-auto p-6 animate-fade-in">
         {activeTab === "summary" ? (
           <SummarySheet
