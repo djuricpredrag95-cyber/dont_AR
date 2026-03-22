@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { ElectionData, DhondtResult, Party } from "@/lib/dhondt";
 
 interface Props {
@@ -9,9 +10,9 @@ interface Props {
   removeParty: (index: number) => void;
 }
 
-export default function SummarySheet({ data, result, updateField, updateParty, addParty, removeParty }: Props) {
+const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, updateField, updateParty, addParty, removeParty }, ref) => {
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       {/* General Info */}
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <div className="bg-table-header px-5 py-3">
@@ -230,7 +231,11 @@ export default function SummarySheet({ data, result, updateField, updateParty, a
       </div>
     </div>
   );
-}
+});
+
+SummarySheet.displayName = "SummarySheet";
+
+export default SummarySheet;
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

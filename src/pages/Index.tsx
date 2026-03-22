@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
 
-const Index = () => {
+const Index = forwardRef<HTMLDivElement>((_, ref) => {
   const [activeTab, setActiveTab] = useState<"summary" | "dhondt">("summary");
   const [data, setData] = useState<ElectionData>(defaultElectionData);
 
@@ -38,7 +38,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={ref} className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
@@ -92,6 +92,8 @@ const Index = () => {
       </main>
     </div>
   );
-};
+});
+
+Index.displayName = "Index";
 
 export default Index;
