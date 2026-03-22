@@ -1,7 +1,9 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
 import { ElectionData } from "@/lib/dhondt";
+
+const STORAGE_KEY = "arandjelovac_election_data";
 
 interface ValidationErrors {
   votesSum?: string;
@@ -28,58 +30,86 @@ function validate(sd: PollingStationData, totalVoters: number): ValidationErrors
   return errors;
 }
 
+function isValid(sd: PollingStationData, totalVoters: number): boolean {
+  return sd.totalVoted > 0 && Object.keys(validate(sd, totalVoters)).length === 0;
+}
+
+function loadSaved(): Record<number, PollingStationData> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveToDisk(data: Record<number, PollingStationData>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
 export default function DataEntry() {
   const navigate = useNavigate();
-  const [allData, setAllData] = useState<Record<number, PollingStationData>>({});
+  const [savedData, setSavedData] = useState<Record<number, PollingStationData>>(loadSaved);
   const [selectedStation, setSelectedStation] = useState<number>(1);
+  const [formData, setFormData] = useState<PollingStationData>(getEmptyStationData(1));
+
+  // Reset form when station changes
+  useEffect(() => {
+    setFormData(getEmptyStationData(selectedStation));
+  }, [selectedStation]);
 
   const station = POLLING_STATIONS.find(s => s.id === selectedStation)!;
-  const stationData = allData[selectedStation] || getEmptyStationData(selectedStation);
-  const errors = validate(stationData, station.totalVoters);
+  const errors = validate(formData, station.totalVoters);
   const hasErrors = Object.keys(errors).length > 0;
+  const formHasData = formData.totalVoted > 0;
+  const formIsValid = formHasData && !hasErrors;
 
-  const updateStation = useCallback((update: Partial<PollingStationData>) => {
-    setAllData(prev => ({
-      ...prev,
-      [selectedStation]: { ...(prev[selectedStation] || getEmptyStationData(selectedStation)), ...update },
-    }));
-  }, [selectedStation]);
+  const updateField = useCallback((update: Partial<PollingStationData>) => {
+    setFormData(prev => ({ ...prev, ...update }));
+  }, []);
 
   const updatePartyVote = useCallback((partyIdx: number, value: number) => {
-    setAllData(prev => {
-      const current = prev[selectedStation] || getEmptyStationData(selectedStation);
-      const newVotes = [...current.partyVotes];
+    setFormData(prev => {
+      const newVotes = [...prev.partyVotes];
       newVotes[partyIdx] = value;
-      return { ...prev, [selectedStation]: { ...current, partyVotes: newVotes } };
+      return { ...prev, partyVotes: newVotes };
     });
-  }, [selectedStation]);
+  }, []);
 
-  const filledStations = useMemo(() => {
-    return Object.entries(allData).filter(([, d]) => d.totalVoted > 0).length;
-  }, [allData]);
+  const saveStation = () => {
+    if (!formIsValid) return;
+    const newSaved = { ...savedData, [selectedStation]: { ...formData, stationId: selectedStation } };
+    setSavedData(newSaved);
+    saveToDisk(newSaved);
+    setFormData(getEmptyStationData(selectedStation));
+  };
+
+  const deleteStation = (id: number) => {
+    const newSaved = { ...savedData };
+    delete newSaved[id];
+    setSavedData(newSaved);
+    saveToDisk(newSaved);
+  };
 
   const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
 
+  // Only aggregate VALID stations
   const aggregated = useMemo(() => {
     let totalVoted = 0, totalInBox = 0, totalInvalid = 0;
     const partyTotals = PARTIES.map(() => 0);
-    Object.values(allData).forEach(d => {
+    let validCount = 0;
+    Object.entries(savedData).forEach(([id, d]) => {
+      const s = POLLING_STATIONS.find(st => st.id === Number(id));
+      if (!s || !isValid(d, s.totalVoters)) return;
+      validCount++;
       totalVoted += d.totalVoted;
       totalInBox += d.totalInBox;
       totalInvalid += d.totalInvalid;
       d.partyVotes.forEach((v, i) => { partyTotals[i] += v; });
     });
-    return { totalVoted, totalInBox, totalInvalid, partyTotals };
-  }, [allData]);
-
-  const hasAnyGlobalErrors = useMemo(() => {
-    return Object.entries(allData).some(([id, d]) => {
-      const s = POLLING_STATIONS.find(st => st.id === Number(id));
-      return s && Object.keys(validate(d, s.totalVoters)).length > 0;
-    });
-  }, [allData]);
+    return { totalVoted, totalInBox, totalInvalid, partyTotals, validCount };
+  }, [savedData]);
 
   const sendToCalculator = () => {
+    if (aggregated.validCount === 0) return;
     const electionData: ElectionData = {
       municipality: "АРАНЂЕЛОВАЦ",
       totalVoters: totalVotersAll,
@@ -97,29 +127,62 @@ export default function DataEntry() {
     navigate("/", { state: { electionData } });
   };
 
+  const exportToExcel = () => {
+    const header = ["Ред.бр.", "Бирачко место", "Адреса", "Бирачи", "Гласали", "У кутији", "Невaжећи",
+      ...PARTIES.map(p => p.name), "Статус"];
+    const rows = POLLING_STATIONS.map(s => {
+      const d = savedData[s.id];
+      if (!d) return [s.id, s.name, s.address, s.totalVoters, "", "", "", ...PARTIES.map(() => ""), "Није унето"];
+      const valid = isValid(d, s.totalVoters);
+      return [s.id, s.name, s.address, s.totalVoters, d.totalVoted, d.totalInBox, d.totalInvalid,
+        ...d.partyVotes, valid ? "✓ Валидно" : "✗ Грешка"];
+    });
+    // Totals row
+    rows.push(["", "УКУПНО", "", totalVotersAll, aggregated.totalVoted, aggregated.totalInBox, aggregated.totalInvalid,
+      ...aggregated.partyTotals, `${aggregated.validCount} валидних`]);
+
+    const csvContent = [header, ...rows].map(row =>
+      row.map(cell => {
+        const str = String(cell ?? "");
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(",")
+    ).join("\n");
+
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rezultati_biracka_mesta.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const savedForStation = savedData[selectedStation];
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card px-6 py-4">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Унос по бирачким местима</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Попуњено {filledStations} / {POLLING_STATIONS.length} бирачких места
+              Сачувано: {aggregated.validCount} / {POLLING_STATIONS.length} · Укупно бирача: {totalVotersAll.toLocaleString("sr")}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-secondary text-secondary-foreground hover:opacity-90 transition-opacity"
-            >
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => navigate("/")}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-secondary text-secondary-foreground hover:opacity-90 transition-opacity">
               ← Калкулатор
             </button>
-            <button
-              onClick={sendToCalculator}
-              disabled={filledStations === 0 || hasAnyGlobalErrors}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              📊 Пребаци у калкулатор
+            <button onClick={exportToExcel}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity">
+              📥 Извези CSV
+            </button>
+            <button onClick={sendToCalculator} disabled={aggregated.validCount === 0}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+              📊 Пребаци у калкулатор ({aggregated.validCount})
             </button>
           </div>
         </div>
@@ -128,22 +191,19 @@ export default function DataEntry() {
       <main className="max-w-[1400px] mx-auto p-6 space-y-6">
         {/* Station selector */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-          <div className="bg-table-header px-5 py-3">
-            <h2 className="text-sm font-semibold text-table-header-foreground uppercase tracking-wider">Бирачко место</h2>
+          <div className="bg-muted px-5 py-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Бирачко место</h2>
           </div>
           <div className="p-5">
-            <select
-              value={selectedStation}
-              onChange={e => setSelectedStation(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
+            <select value={selectedStation} onChange={e => setSelectedStation(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               {POLLING_STATIONS.map(s => {
-                const d = allData[s.id];
-                const filled = d && d.totalVoted > 0;
-                const hasErr = d && Object.keys(validate(d, s.totalVoters)).length > 0;
+                const saved = savedData[s.id];
+                const hasSaved = !!saved;
+                const valid = saved && isValid(saved, s.totalVoters);
                 return (
                   <option key={s.id} value={s.id}>
-                    {s.id}. {s.name} — {s.address} ({s.totalVoters} бирача) {filled ? (hasErr ? "⚠️" : "✅") : ""}
+                    {s.id}. {s.name} — {s.address} ({s.totalVoters}) {hasSaved ? (valid ? "✅" : "⚠️") : ""}
                   </option>
                 );
               })}
@@ -151,50 +211,52 @@ export default function DataEntry() {
             <div className="mt-2 text-sm text-muted-foreground">
               <strong>Адреса:</strong> {station.address} · <strong>Бирача:</strong> {station.totalVoters.toLocaleString("sr")}
             </div>
+            {savedForStation && (
+              <div className="mt-2 flex items-center gap-3">
+                <span className={`text-sm font-medium ${isValid(savedForStation, station.totalVoters) ? "text-green-600" : "text-destructive"}`}>
+                  {isValid(savedForStation, station.totalVoters) ? "✅ Сачувано и валидно" : "⚠️ Сачувано али има грешака"}
+                </span>
+                <button onClick={() => deleteStation(selectedStation)}
+                  className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition">
+                  🗑 Обриши
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Voting data */}
+        {/* Voting data form - always empty */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-          <div className="bg-table-header px-5 py-3">
-            <h2 className="text-sm font-semibold text-table-header-foreground uppercase tracking-wider">Подаци о гласању</h2>
+          <div className="bg-muted px-5 py-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Унос података</h2>
           </div>
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Гласали</label>
-              <input
-                type="number"
+              <input type="number" min="0" max={station.totalVoters}
                 className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                value={stationData.totalVoted || ""}
-                onChange={e => updateStation({ totalVoted: Number(e.target.value) })}
-              />
+                value={formData.totalVoted || ""} onChange={e => updateField({ totalVoted: Number(e.target.value) })} />
               <p className="text-xs text-muted-foreground mt-1">Макс: {station.totalVoters}</p>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Листића у кутији</label>
-              <input
-                type="number"
+              <input type="number" min="0"
                 className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                value={stationData.totalInBox || ""}
-                onChange={e => updateStation({ totalInBox: Number(e.target.value) })}
-              />
+                value={formData.totalInBox || ""} onChange={e => updateField({ totalInBox: Number(e.target.value) })} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Невaжећи листићи</label>
-              <input
-                type="number"
+              <input type="number" min="0"
                 className="mt-1 w-full px-3 py-2 rounded-lg border bg-background text-foreground font-mono text-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                value={stationData.totalInvalid || ""}
-                onChange={e => updateStation({ totalInvalid: Number(e.target.value) })}
-              />
+                value={formData.totalInvalid || ""} onChange={e => updateField({ totalInvalid: Number(e.target.value) })} />
             </div>
           </div>
         </div>
 
         {/* Party votes */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-          <div className="bg-table-header px-5 py-3">
-            <h2 className="text-sm font-semibold text-table-header-foreground uppercase tracking-wider">Гласови по листама</h2>
+          <div className="bg-muted px-5 py-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Гласови по листама</h2>
           </div>
           <div className="p-5 space-y-3">
             {PARTIES.map((party, i) => (
@@ -205,24 +267,21 @@ export default function DataEntry() {
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground font-medium">МАЊ.</span>
                   )}
                 </div>
-                <input
-                  type="number"
+                <input type="number" min="0"
                   className="flex-1 px-3 py-2 rounded-lg border bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={stationData.partyVotes[i] || ""}
-                  onChange={e => updatePartyVote(i, Number(e.target.value))}
-                />
+                  value={formData.partyVotes[i] || ""} onChange={e => updatePartyVote(i, Number(e.target.value))} />
               </div>
             ))}
             <div className="flex items-center gap-4 pt-2 border-t">
               <div className="w-48 text-sm font-semibold text-foreground">Збир важећих</div>
               <div className="flex-1 px-3 py-2 rounded-lg bg-secondary font-mono font-semibold text-foreground">
-                {stationData.partyVotes.reduce((a, b) => a + b, 0).toLocaleString("sr")}
+                {formData.partyVotes.reduce((a, b) => a + b, 0).toLocaleString("sr")}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Validation */}
+        {/* Validation + Save */}
         {hasErrors && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 space-y-2">
             <h3 className="text-sm font-semibold text-destructive">⚠️ Грешке у провери</h3>
@@ -231,10 +290,17 @@ export default function DataEntry() {
           </div>
         )}
 
+        <button onClick={saveStation} disabled={!formIsValid}
+          className="w-full py-3 text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+          💾 Сачувај БМ {selectedStation} {savedForStation ? "(замени)" : ""}
+        </button>
+
         {/* Aggregated totals */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-          <div className="bg-table-header px-5 py-3">
-            <h2 className="text-sm font-semibold text-table-header-foreground uppercase tracking-wider">Збирни преглед (сва БМ)</h2>
+          <div className="bg-muted px-5 py-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Збирни преглед — {aggregated.validCount} валидних БМ
+            </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -246,7 +312,7 @@ export default function DataEntry() {
               </thead>
               <tbody>
                 {PARTIES.map((p, i) => (
-                  <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-card" : "bg-table-row-even"}`}>
+                  <tr key={i} className="border-b even:bg-muted/50">
                     <td className="px-4 py-2 text-sm font-medium text-foreground">{p.name} {p.isMinority ? "(мањ.)" : ""}</td>
                     <td className="px-4 py-2 text-right font-mono text-sm font-semibold text-foreground">{aggregated.partyTotals[i].toLocaleString("sr")}</td>
                   </tr>
