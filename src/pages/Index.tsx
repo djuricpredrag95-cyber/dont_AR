@@ -68,21 +68,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
 
   const result = useMemo(() => calculateDhondt(data), [data]);
 
-  const aggregated = useMemo(() => {
-    let totalVoted = 0, totalInBox = 0, totalInvalid = 0;
-    const partyTotals = PARTIES.map(() => 0);
-    let validCount = 0;
-    Object.entries(savedData).forEach(([id, d]) => {
-      const s = POLLING_STATIONS.find(st => st.id === Number(id));
-      if (!s || !isValid(d, s.totalVoters)) return;
-      validCount++;
-      totalVoted += d.totalVoted;
-      totalInBox += d.totalInBox;
-      totalInvalid += d.totalInvalid;
-      d.partyVotes.forEach((v, i) => { partyTotals[i] += v; });
-    });
-    return { totalVoted, totalInBox, totalInvalid, partyTotals, validCount };
-  }, [savedData]);
 
   const loadFromStations = () => {
     if (aggregated.validCount === 0) return;
