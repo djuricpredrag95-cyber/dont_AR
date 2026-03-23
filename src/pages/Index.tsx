@@ -262,7 +262,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
             </div>
           </div>
         ) : activeTab === "summary" ? (
-          <SummarySheet data={data} result={result} updateField={updateField} updateParty={updateParty} addParty={addParty} removeParty={removeParty} />
+          <SummarySheet data={data} result={result} processedStations={aggregated.validCount} totalStations={POLLING_STATIONS.length} updateField={updateField} updateParty={updateParty} addParty={addParty} removeParty={removeParty} />
         ) : (
           <DhondtSheet data={data} result={result} />
         )}

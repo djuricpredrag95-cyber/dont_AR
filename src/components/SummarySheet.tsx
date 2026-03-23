@@ -98,9 +98,9 @@ const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, processe
             <p className="text-xs text-muted-foreground mt-1">У кутији − Неважећи</p>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Бир. места</label>
-            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg">
-              {data.totalMandates} од {data.totalMandates}
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Обрађена БМ</label>
+            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg font-bold">
+              {processedStations} <span className="text-sm font-normal text-muted-foreground">од {totalStations}</span>
             </div>
           </div>
         </div>
