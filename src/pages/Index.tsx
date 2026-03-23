@@ -22,6 +22,24 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   const { savedData, loading, deleteStation: deleteFromDb } = useStationData();
   const location = useLocation();
 
+  const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
+
+  const aggregated = useMemo(() => {
+    let totalVoted = 0, totalInBox = 0, totalInvalid = 0;
+    const partyTotals = PARTIES.map(() => 0);
+    let validCount = 0;
+    Object.entries(savedData).forEach(([id, d]) => {
+      const s = POLLING_STATIONS.find(st => st.id === Number(id));
+      if (!s || !isValid(d, s.totalVoters)) return;
+      validCount++;
+      totalVoted += d.totalVoted;
+      totalInBox += d.totalInBox;
+      totalInvalid += d.totalInvalid;
+      d.partyVotes.forEach((v, i) => { partyTotals[i] += v; });
+    });
+    return { totalVoted, totalInBox, totalInvalid, partyTotals, validCount };
+  }, [savedData]);
+
   useEffect(() => {
     if (location.state?.electionData) {
       setData(location.state.electionData);
@@ -32,8 +50,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   // Auto-load aggregated data from stations whenever savedData changes
   useEffect(() => {
     if (aggregated.validCount === 0) return;
-    setData(prev => ({
-      ...prev,
+    setData({
       municipality: "АРАНЂЕЛОВАЦ",
       totalVoters: totalVotersAll,
       totalMandates: 41,
@@ -46,11 +63,10 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
         isMinority: p.isMinority,
         minorityCoefficient: p.minorityCoefficient,
       })),
-    }));
+    });
   }, [aggregated, totalVotersAll]);
 
   const result = useMemo(() => calculateDhondt(data), [data]);
-  const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
 
   const aggregated = useMemo(() => {
     let totalVoted = 0, totalInBox = 0, totalInvalid = 0;
