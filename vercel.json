@@ -3,6 +3,6 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/dont_AR/:path*", "destination": "/:path*" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
