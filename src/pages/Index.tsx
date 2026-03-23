@@ -1,22 +1,126 @@
 import { forwardRef, useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
+import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+
+const STORAGE_KEY = "arandjelovac_election_data";
+
+function loadSaved(): Record<number, PollingStationData> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function isValid(sd: PollingStationData, totalVoters: number): boolean {
+  if (sd.totalVoted <= 0) return false;
+  const sumParty = sd.partyVotes.reduce((a, b) => a + b, 0);
+  if (sd.totalInBox > 0 && sumParty + sd.totalInvalid !== sd.totalInBox) return false;
+  if (sd.totalInBox > sd.totalVoted) return false;
+  if (sd.totalVoted > totalVoters) return false;
+  return true;
+}
 
 const Index = forwardRef<HTMLDivElement>((_, ref) => {
-  const [activeTab, setActiveTab] = useState<"summary" | "dhondt">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "dhondt" | "overview">("overview");
   const [data, setData] = useState<ElectionData>(defaultElectionData);
+  const [savedData, setSavedData] = useState<Record<number, PollingStationData>>(loadSaved);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Reload saved data periodically
+  useEffect(() => {
+    const interval = setInterval(() => setSavedData(loadSaved()), 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (location.state?.electionData) {
       setData(location.state.electionData);
+      setActiveTab("summary");
     }
   }, [location.state]);
 
   const result = useMemo(() => calculateDhondt(data), [data]);
+
+  const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
+
+  const aggregated = useMemo(() => {
+    let totalVoted = 0, totalInBox = 0, totalInvalid = 0;
+    const partyTotals = PARTIES.map(() => 0);
+    let validCount = 0;
+    Object.entries(savedData).forEach(([id, d]) => {
+      const s = POLLING_STATIONS.find(st => st.id === Number(id));
+      if (!s || !isValid(d, s.totalVoters)) return;
+      validCount++;
+      totalVoted += d.totalVoted;
+      totalInBox += d.totalInBox;
+      totalInvalid += d.totalInvalid;
+      d.partyVotes.forEach((v, i) => { partyTotals[i] += v; });
+    });
+    return { totalVoted, totalInBox, totalInvalid, partyTotals, validCount };
+  }, [savedData]);
+
+  const loadFromStations = () => {
+    if (aggregated.validCount === 0) return;
+    const electionData: ElectionData = {
+      municipality: "АРАНЂЕЛОВАЦ",
+      totalVoters: totalVotersAll,
+      totalMandates: 41,
+      totalVoted: aggregated.totalVoted,
+      totalInBox: aggregated.totalInBox,
+      totalInvalid: aggregated.totalInvalid,
+      parties: PARTIES.map((p, i) => ({
+        name: p.name,
+        votes: aggregated.partyTotals[i],
+        isMinority: p.isMinority,
+        minorityCoefficient: p.minorityCoefficient,
+      })),
+    };
+    setData(electionData);
+    setActiveTab("summary");
+  };
+
+  const deleteStation = (id: number) => {
+    const newSaved = { ...savedData };
+    delete newSaved[id];
+    setSavedData(newSaved);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSaved));
+  };
+
+  const exportToExcel = () => {
+    const header = ["Ред.бр.", "Бирачко место", "Адреса", "Бирачи", "Гласали", "У кутији", "Невaжећи",
+      ...PARTIES.map(p => p.name), "Статус"];
+    const rows = POLLING_STATIONS.map(s => {
+      const d = savedData[s.id];
+      if (!d) return [s.id, s.name, s.address, s.totalVoters, "", "", "", ...PARTIES.map(() => ""), "Није унето"];
+      const valid = isValid(d, s.totalVoters);
+      return [s.id, s.name, s.address, s.totalVoters, d.totalVoted, d.totalInBox, d.totalInvalid,
+        ...d.partyVotes, valid ? "✓ Валидно" : "✗ Грешка"];
+    });
+    rows.push(["", "УКУПНО", "", totalVotersAll, aggregated.totalVoted, aggregated.totalInBox, aggregated.totalInvalid,
+      ...aggregated.partyTotals, `${aggregated.validCount} валидних`]);
+
+    const csvContent = [header, ...rows].map(row =>
+      row.map(cell => {
+        const str = String(cell ?? "");
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(",")
+    ).join("\n");
+
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rezultati_biracka_mesta.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const updateParty = (index: number, field: keyof Party, value: string | number | boolean) => {
     setData(prev => ({
@@ -49,7 +153,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   return (
     <div ref={ref} className="min-h-screen bg-background">
       <header className="border-b bg-card px-6 py-4">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Д'Онт калкулатор
@@ -58,41 +162,123 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
               Распоред мандата — {data.municipality}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate("/unos")}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity"
-            >
-              📝 Унос по БМ
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={exportToExcel}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity">
+              📥 Извези CSV
+            </button>
+            <button onClick={loadFromStations} disabled={aggregated.validCount === 0}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+              📊 Учитај из БМ ({aggregated.validCount})
             </button>
             <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab("summary")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                  activeTab === "summary"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                📊 Преглед
-              </button>
-              <button
-                onClick={() => setActiveTab("dhondt")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                  activeTab === "dhondt"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                🔢 Д'Онт обрачун
-              </button>
+              {(["overview", "summary", "dhondt"] as const).map(tab => (
+                <button key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    activeTab === tab
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}>
+                  {tab === "overview" ? "📋 Преглед БМ" : tab === "summary" ? "📊 Резултати" : "🔢 Д'Онт"}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto p-6 animate-fade-in">
-        {activeTab === "summary" ? (
+        {activeTab === "overview" ? (
+          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+            <div className="bg-muted px-5 py-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Преглед свих бирачких места — {aggregated.validCount} / {POLLING_STATIONS.length} унето
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary">
+                    <TableHead className="text-xs font-semibold uppercase w-12">Бр.</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase">Бирачко место</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right">Бирачи</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right">Гласали</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right">У кутији</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right">Невaж.</TableHead>
+                    {PARTIES.map((p, i) => (
+                      <TableHead key={i} className="text-xs font-semibold uppercase text-right">{p.name}</TableHead>
+                    ))}
+                    <TableHead className="text-xs font-semibold uppercase text-center">Статус</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {POLLING_STATIONS.map(s => {
+                    const d = savedData[s.id];
+                    const valid = d ? isValid(d, s.totalVoters) : false;
+                    return (
+                      <TableRow key={s.id} className={d ? (valid ? "bg-green-50/50 dark:bg-green-950/20" : "bg-destructive/5") : ""}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{s.id}</TableCell>
+                        <TableCell className="text-sm">
+                          <div className="font-medium text-foreground">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">{s.address}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground">{s.totalVoters.toLocaleString("sr")}</TableCell>
+                        {d ? (
+                          <>
+                            <TableCell className="text-right font-mono text-sm text-foreground">{d.totalVoted.toLocaleString("sr")}</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-foreground">{d.totalInBox.toLocaleString("sr")}</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-foreground">{d.totalInvalid.toLocaleString("sr")}</TableCell>
+                            {d.partyVotes.map((v, i) => (
+                              <TableCell key={i} className="text-right font-mono text-sm text-foreground">{v.toLocaleString("sr")}</TableCell>
+                            ))}
+                            <TableCell className="text-center">
+                              <span className={`text-xs font-medium ${valid ? "text-green-600" : "text-destructive"}`}>
+                                {valid ? "✅" : "⚠️"}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <button onClick={() => deleteStation(s.id)}
+                                className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition">
+                                🗑
+                              </button>
+                            </TableCell>
+                          </>
+                        ) : (
+                          <>
+                            <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                            <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                            <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                            {PARTIES.map((_, i) => (
+                              <TableCell key={i} className="text-right text-muted-foreground/40">—</TableCell>
+                            ))}
+                            <TableCell className="text-center text-muted-foreground/40 text-xs">Чека унос</TableCell>
+                            <TableCell></TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                  {/* Totals row */}
+                  <TableRow className="bg-secondary font-semibold border-t-2">
+                    <TableCell></TableCell>
+                    <TableCell className="text-sm text-secondary-foreground">УКУПНО</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-secondary-foreground">{totalVotersAll.toLocaleString("sr")}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalVoted.toLocaleString("sr")}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalInBox.toLocaleString("sr")}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalInvalid.toLocaleString("sr")}</TableCell>
+                    {aggregated.partyTotals.map((t, i) => (
+                      <TableCell key={i} className="text-right font-mono text-sm text-secondary-foreground">{t.toLocaleString("sr")}</TableCell>
+                    ))}
+                    <TableCell className="text-center text-xs text-secondary-foreground">{aggregated.validCount} ✅</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : activeTab === "summary" ? (
           <SummarySheet
             data={data}
             result={result}
