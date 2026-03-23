@@ -22,14 +22,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   const { savedData, loading, deleteStation: deleteFromDb } = useStationData();
   const location = useLocation();
 
-  useEffect(() => {
-    if (location.state?.electionData) {
-      setData(location.state.electionData);
-      setActiveTab("summary");
-    }
-  }, [location.state]);
-
-  const result = useMemo(() => calculateDhondt(data), [data]);
   const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
 
   const aggregated = useMemo(() => {
@@ -47,6 +39,35 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
     });
     return { totalVoted, totalInBox, totalInvalid, partyTotals, validCount };
   }, [savedData]);
+
+  useEffect(() => {
+    if (location.state?.electionData) {
+      setData(location.state.electionData);
+      setActiveTab("summary");
+    }
+  }, [location.state]);
+
+  // Auto-load aggregated data from stations whenever savedData changes
+  useEffect(() => {
+    if (aggregated.validCount === 0) return;
+    setData({
+      municipality: "АРАНЂЕЛОВАЦ",
+      totalVoters: totalVotersAll,
+      totalMandates: 41,
+      totalVoted: aggregated.totalVoted,
+      totalInBox: aggregated.totalInBox,
+      totalInvalid: aggregated.totalInvalid,
+      parties: PARTIES.map((p, i) => ({
+        name: p.name,
+        votes: aggregated.partyTotals[i],
+        isMinority: p.isMinority,
+        minorityCoefficient: p.minorityCoefficient,
+      })),
+    });
+  }, [aggregated, totalVotersAll]);
+
+  const result = useMemo(() => calculateDhondt(data), [data]);
+
 
   const loadFromStations = () => {
     if (aggregated.validCount === 0) return;
@@ -241,7 +262,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
             </div>
           </div>
         ) : activeTab === "summary" ? (
-          <SummarySheet data={data} result={result} updateField={updateField} updateParty={updateParty} addParty={addParty} removeParty={removeParty} />
+          <SummarySheet data={data} result={result} processedStations={aggregated.validCount} totalStations={POLLING_STATIONS.length} updateField={updateField} updateParty={updateParty} addParty={addParty} removeParty={removeParty} />
         ) : (
           <DhondtSheet data={data} result={result} />
         )}

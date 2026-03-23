@@ -4,13 +4,15 @@ import { ElectionData, DhondtResult, Party } from "@/lib/dhondt";
 interface Props {
   data: ElectionData;
   result: DhondtResult;
+  processedStations: number;
+  totalStations: number;
   updateField: (field: keyof ElectionData, value: string | number) => void;
   updateParty: (index: number, field: keyof Party, value: string | number | boolean) => void;
   addParty: () => void;
   removeParty: (index: number) => void;
 }
 
-const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, updateField, updateParty, addParty, removeParty }, ref) => {
+const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, processedStations, totalStations, updateField, updateParty, addParty, removeParty }, ref) => {
   return (
     <div ref={ref} className="space-y-6">
       {/* General Info */}
@@ -96,9 +98,9 @@ const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, updateFi
             <p className="text-xs text-muted-foreground mt-1">У кутији − Неважећи</p>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Бир. места</label>
-            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg">
-              {data.totalMandates} од {data.totalMandates}
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Обрађена БМ</label>
+            <div className="mt-1 w-full px-3 py-2 rounded-lg border bg-secondary text-foreground font-mono text-lg font-bold">
+              {processedStations} <span className="text-sm font-normal text-muted-foreground">од {totalStations}</span>
             </div>
           </div>
         </div>
