@@ -4,6 +4,8 @@ import { ElectionData, DhondtResult, Party } from "@/lib/dhondt";
 interface Props {
   data: ElectionData;
   result: DhondtResult;
+  processedStations: number;
+  totalStations: number;
   updateField: (field: keyof ElectionData, value: string | number) => void;
   updateParty: (index: number, field: keyof Party, value: string | number | boolean) => void;
   addParty: () => void;
