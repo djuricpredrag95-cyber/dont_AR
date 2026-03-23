@@ -12,7 +12,7 @@ interface Props {
   removeParty: (index: number) => void;
 }
 
-const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, updateField, updateParty, addParty, removeParty }, ref) => {
+const SummarySheet = forwardRef<HTMLDivElement, Props>(({ data, result, processedStations, totalStations, updateField, updateParty, addParty, removeParty }, ref) => {
   return (
     <div ref={ref} className="space-y-6">
       {/* General Info */}
