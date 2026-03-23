@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
-
-const STORAGE_KEY = "arandjelovac_election_data";
+import { useStationData } from "@/hooks/useStationData";
 
 interface ValidationErrors {
   votesSum?: string;
@@ -32,24 +31,16 @@ function isValid(sd: PollingStationData, totalVoters: number): boolean {
   return sd.totalVoted > 0 && Object.keys(validate(sd, totalVoters)).length === 0;
 }
 
-function loadSaved(): Record<number, PollingStationData> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-function saveToDisk(data: Record<number, PollingStationData>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 export default function DataEntry() {
-  const [savedData, setSavedData] = useState<Record<number, PollingStationData>>(loadSaved);
+  const { savedData, loading, saveStation: saveToDb } = useStationData();
   const [selectedStation, setSelectedStation] = useState<number>(1);
   const [formData, setFormData] = useState<PollingStationData>(getEmptyStationData(1));
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(getEmptyStationData(selectedStation));
+    setSaveMsg(null);
   }, [selectedStation]);
 
   const station = POLLING_STATIONS.find(s => s.id === selectedStation)!;
@@ -70,16 +61,30 @@ export default function DataEntry() {
     });
   }, []);
 
-  const saveStation = () => {
+  const saveStation = async () => {
     if (!formIsValid) return;
-    const newSaved = { ...savedData, [selectedStation]: { ...formData, stationId: selectedStation } };
-    setSavedData(newSaved);
-    saveToDisk(newSaved);
-    setFormData(getEmptyStationData(selectedStation));
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await saveToDb({ ...formData, stationId: selectedStation });
+      setFormData(getEmptyStationData(selectedStation));
+      setSaveMsg("✅ Сачувано!");
+    } catch {
+      setSaveMsg("❌ Грешка при чувању. Покушајте поново.");
+    }
+    setSaving(false);
   };
 
   const savedForStation = savedData[selectedStation];
   const savedCount = Object.keys(savedData).length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Учитавање...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -93,7 +98,6 @@ export default function DataEntry() {
       </header>
 
       <main className="max-w-[800px] mx-auto p-6 space-y-6">
-        {/* Station selector */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
           <div className="bg-muted px-5 py-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Бирачко место</h2>
@@ -125,7 +129,6 @@ export default function DataEntry() {
           </div>
         </div>
 
-        {/* Voting data form */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
           <div className="bg-muted px-5 py-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Унос података</h2>
@@ -153,7 +156,6 @@ export default function DataEntry() {
           </div>
         </div>
 
-        {/* Party votes */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
           <div className="bg-muted px-5 py-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Гласови по листама</h2>
@@ -181,7 +183,6 @@ export default function DataEntry() {
           </div>
         </div>
 
-        {/* Validation */}
         {hasErrors && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 space-y-2">
             <h3 className="text-sm font-semibold text-destructive">⚠️ Грешке у провери</h3>
@@ -190,9 +191,13 @@ export default function DataEntry() {
           </div>
         )}
 
-        <button onClick={saveStation} disabled={!formIsValid}
+        {saveMsg && (
+          <p className={`text-sm font-medium ${saveMsg.startsWith("✅") ? "text-green-600" : "text-destructive"}`}>{saveMsg}</p>
+        )}
+
+        <button onClick={saveStation} disabled={!formIsValid || saving}
           className="w-full py-3 text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
-          💾 Сачувај БМ {selectedStation} {savedForStation ? "(замени)" : ""}
+          {saving ? "⏳ Чување..." : `💾 Сачувај БМ ${selectedStation} ${savedForStation ? "(замени)" : ""}`}
         </button>
       </main>
     </div>

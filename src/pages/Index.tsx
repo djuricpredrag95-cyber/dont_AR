@@ -1,19 +1,11 @@
 import { forwardRef, useMemo, useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
+import { useStationData } from "@/hooks/useStationData";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-
-const STORAGE_KEY = "arandjelovac_election_data";
-
-function loadSaved(): Record<number, PollingStationData> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
 
 function isValid(sd: PollingStationData, totalVoters: number): boolean {
   if (sd.totalVoted <= 0) return false;
@@ -27,15 +19,8 @@ function isValid(sd: PollingStationData, totalVoters: number): boolean {
 const Index = forwardRef<HTMLDivElement>((_, ref) => {
   const [activeTab, setActiveTab] = useState<"summary" | "dhondt" | "overview">("overview");
   const [data, setData] = useState<ElectionData>(defaultElectionData);
-  const [savedData, setSavedData] = useState<Record<number, PollingStationData>>(loadSaved);
+  const { savedData, loading, deleteStation: deleteFromDb } = useStationData();
   const location = useLocation();
-  const navigate = useNavigate();
-
-  // Reload saved data periodically
-  useEffect(() => {
-    const interval = setInterval(() => setSavedData(loadSaved()), 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (location.state?.electionData) {
@@ -45,7 +30,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   }, [location.state]);
 
   const result = useMemo(() => calculateDhondt(data), [data]);
-
   const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
 
   const aggregated = useMemo(() => {
@@ -66,7 +50,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
 
   const loadFromStations = () => {
     if (aggregated.validCount === 0) return;
-    const electionData: ElectionData = {
+    setData({
       municipality: "АРАНЂЕЛОВАЦ",
       totalVoters: totalVotersAll,
       totalMandates: 41,
@@ -79,16 +63,12 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
         isMinority: p.isMinority,
         minorityCoefficient: p.minorityCoefficient,
       })),
-    };
-    setData(electionData);
+    });
     setActiveTab("summary");
   };
 
-  const deleteStation = (id: number) => {
-    const newSaved = { ...savedData };
-    delete newSaved[id];
-    setSavedData(newSaved);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSaved));
+  const deleteStation = async (id: number) => {
+    try { await deleteFromDb(id); } catch { /* logged in hook */ }
   };
 
   const exportToExcel = () => {
@@ -103,7 +83,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
     });
     rows.push(["", "УКУПНО", "", totalVotersAll, aggregated.totalVoted, aggregated.totalInBox, aggregated.totalInvalid,
       ...aggregated.partyTotals, `${aggregated.validCount} валидних`]);
-
     const csvContent = [header, ...rows].map(row =>
       row.map(cell => {
         const str = String(cell ?? "");
@@ -111,56 +90,43 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
           ? `"${str.replace(/"/g, '""')}"` : str;
       }).join(",")
     ).join("\n");
-
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = "rezultati_biracka_mesta.csv";
-    a.click();
+    a.href = url; a.download = "rezultati_biracka_mesta.csv"; a.click();
     URL.revokeObjectURL(url);
   };
 
   const updateParty = (index: number, field: keyof Party, value: string | number | boolean) => {
-    setData(prev => ({
-      ...prev,
-      parties: prev.parties.map((p, i) =>
-        i === index ? { ...p, [field]: value } : p
-      ),
-    }));
+    setData(prev => ({ ...prev, parties: prev.parties.map((p, i) => i === index ? { ...p, [field]: value } : p) }));
   };
-
   const updateField = (field: keyof ElectionData, value: string | number) => {
     setData(prev => ({ ...prev, [field]: value }));
   };
-
   const addParty = () => {
-    setData(prev => ({
-      ...prev,
-      parties: [...prev.parties, { name: "Нова листа", votes: 0, isMinority: false, minorityCoefficient: 1 }],
-    }));
+    setData(prev => ({ ...prev, parties: [...prev.parties, { name: "Нова листа", votes: 0, isMinority: false, minorityCoefficient: 1 }] }));
   };
-
   const removeParty = (index: number) => {
     if (data.parties.length <= 2) return;
-    setData(prev => ({
-      ...prev,
-      parties: prev.parties.filter((_, i) => i !== index),
-    }));
+    setData(prev => ({ ...prev, parties: prev.parties.filter((_, i) => i !== index) }));
   };
+
+  if (loading) {
+    return (
+      <div ref={ref} className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Учитавање података...</p>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="min-h-screen bg-background">
       <header className="border-b bg-card px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Д'Онт калкулатор
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Распоред мандата — {data.municipality}
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Д'Онт калкулатор</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Распоред мандата — {data.municipality}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={exportToExcel}
@@ -173,12 +139,9 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
             </button>
             <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
               {(["overview", "summary", "dhondt"] as const).map(tab => (
-                <button key={tab}
-                  onClick={() => setActiveTab(tab)}
+                <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    activeTab === tab
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                    activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}>
                   {tab === "overview" ? "📋 Преглед БМ" : tab === "summary" ? "📊 Резултати" : "🔢 Д'Онт"}
                 </button>
@@ -191,7 +154,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
       <main className="max-w-[1400px] mx-auto p-6 animate-fade-in">
         {activeTab === "overview" ? (
           <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-            <div className="bg-muted px-5 py-3 flex items-center justify-between">
+            <div className="bg-muted px-5 py-3">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Преглед свих бирачких места — {aggregated.validCount} / {POLLING_STATIONS.length} унето
               </h2>
@@ -260,7 +223,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                       </TableRow>
                     );
                   })}
-                  {/* Totals row */}
                   <TableRow className="bg-secondary font-semibold border-t-2">
                     <TableCell></TableCell>
                     <TableCell className="text-sm text-secondary-foreground">УКУПНО</TableCell>
@@ -279,14 +241,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
             </div>
           </div>
         ) : activeTab === "summary" ? (
-          <SummarySheet
-            data={data}
-            result={result}
-            updateField={updateField}
-            updateParty={updateParty}
-            addParty={addParty}
-            removeParty={removeParty}
-          />
+          <SummarySheet data={data} result={result} updateField={updateField} updateParty={updateParty} addParty={addParty} removeParty={removeParty} />
         ) : (
           <DhondtSheet data={data} result={result} />
         )}
@@ -296,5 +251,4 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
 });
 
 Index.displayName = "Index";
-
 export default Index;
