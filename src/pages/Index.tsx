@@ -29,6 +29,26 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
     }
   }, [location.state]);
 
+  // Auto-load aggregated data from stations whenever savedData changes
+  useEffect(() => {
+    if (aggregated.validCount === 0) return;
+    setData(prev => ({
+      ...prev,
+      municipality: "АРАНЂЕЛОВАЦ",
+      totalVoters: totalVotersAll,
+      totalMandates: 41,
+      totalVoted: aggregated.totalVoted,
+      totalInBox: aggregated.totalInBox,
+      totalInvalid: aggregated.totalInvalid,
+      parties: PARTIES.map((p, i) => ({
+        name: p.name,
+        votes: aggregated.partyTotals[i],
+        isMinority: p.isMinority,
+        minorityCoefficient: p.minorityCoefficient,
+      })),
+    }));
+  }, [aggregated, totalVotersAll]);
+
   const result = useMemo(() => calculateDhondt(data), [data]);
   const totalVotersAll = POLLING_STATIONS.reduce((a, s) => a + s.totalVoters, 0);
 
