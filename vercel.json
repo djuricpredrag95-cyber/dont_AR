@@ -2,6 +2,20 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "izlaznost.djuricx.com" }],
+      "destination": "/izlaznost/pregled",
+      "permanent": false
+    },
+    {
+      "source": "/pregled",
+      "has": [{ "type": "host", "value": "izlaznost.djuricx.com" }],
+      "destination": "/izlaznost/pregled",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
