@@ -231,6 +231,20 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                                 🗑
                               </button>
                             </TableCell>
+                            {(() => {
+                              const e22 = ELECTION_2022[s.id];
+                              return e22 ? (
+                                <>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.totalVoted.toLocaleString("sr")}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.snsVotes.toLocaleString("sr")}</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                </>
+                              );
+                            })()}
                           </>
                         ) : (
                           <>
