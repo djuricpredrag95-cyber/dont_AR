@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
 import { useStationData } from "@/hooks/useStationData";
+import { ELECTION_2022 } from "@/lib/historical2022";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -195,6 +196,8 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                     ))}
                     <TableHead className="text-xs font-semibold uppercase text-center">Статус</TableHead>
                     <TableHead className="text-xs font-semibold uppercase w-12"></TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right text-muted-foreground">2022 Гласали</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right text-muted-foreground">2022 СНС</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -228,6 +231,20 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                                 🗑
                               </button>
                             </TableCell>
+                            {(() => {
+                              const e22 = ELECTION_2022[s.id];
+                              return e22 ? (
+                                <>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.totalVoted.toLocaleString("sr")}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.snsVotes.toLocaleString("sr")}</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                </>
+                              );
+                            })()}
                           </>
                         ) : (
                           <>
@@ -239,6 +256,20 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                             ))}
                             <TableCell className="text-center text-muted-foreground/40 text-xs">Чека унос</TableCell>
                             <TableCell></TableCell>
+                            {(() => {
+                              const e22 = ELECTION_2022[s.id];
+                              return e22 ? (
+                                <>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.totalVoted.toLocaleString("sr")}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{e22.snsVotes.toLocaleString("sr")}</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                  <TableCell className="text-right text-muted-foreground/40">—</TableCell>
+                                </>
+                              );
+                            })()}
                           </>
                         )}
                       </TableRow>
@@ -256,6 +287,24 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                     ))}
                     <TableCell className="text-center text-xs text-secondary-foreground">{aggregated.validCount} ✅</TableCell>
                     <TableCell></TableCell>
+                    {(() => {
+                      let totalVoted2022 = 0, totalSns2022 = 0;
+                      const seen = new Set<number>();
+                      POLLING_STATIONS.forEach(s => {
+                        const e = ELECTION_2022[s.id];
+                        if (!e) return;
+                        // Don't double-count BM 13+14 (same old data)
+                        if (s.id === 14) return;
+                        totalVoted2022 += e.totalVoted;
+                        totalSns2022 += e.snsVotes;
+                      });
+                      return (
+                        <>
+                          <TableCell className="text-right font-mono text-xs text-secondary-foreground">{totalVoted2022.toLocaleString("sr")}</TableCell>
+                          <TableCell className="text-right font-mono text-xs text-secondary-foreground">{totalSns2022.toLocaleString("sr")}</TableCell>
+                        </>
+                      );
+                    })()}
                   </TableRow>
                 </TableBody>
               </Table>
