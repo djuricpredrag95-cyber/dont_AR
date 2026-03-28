@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTurnoutOrganizations, useTurnoutEntries } from "@/hooks/useTurnoutData";
 import { HOURS } from "@/lib/turnoutConstants";
-import { HISTORICAL_TURNOUT } from "@/lib/historicalTurnout";
+import { HISTORICAL_TURNOUT, HISTORICAL_COMBINED_BMS } from "@/lib/historicalTurnout";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -176,7 +176,9 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
                       {hist && (
                         <>
                           <TableRow key={`${org.id}-2022`} className="bg-muted/30">
-                            <TableCell className="text-xs text-muted-foreground italic pl-8">↳ 2022</TableCell>
+                            <TableCell className="text-xs text-muted-foreground italic pl-8">
+                              ↳ 2022{HISTORICAL_COMBINED_BMS.has(org.id) ? " (стари БМ 13)" : ""}
+                            </TableCell>
                             {HOURS.map(h => {
                               const v = hist[h]?.y2022;
                               return (
@@ -190,7 +192,9 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
                             </TableCell>
                           </TableRow>
                           <TableRow key={`${org.id}-2023`} className="bg-muted/30">
-                            <TableCell className="text-xs text-muted-foreground italic pl-8">↳ 2023</TableCell>
+                            <TableCell className="text-xs text-muted-foreground italic pl-8">
+                              ↳ 2023{HISTORICAL_COMBINED_BMS.has(org.id) ? " (стари БМ 13)" : ""}
+                            </TableCell>
                             {HOURS.map(h => {
                               const v = hist[h]?.y2023;
                               return (
