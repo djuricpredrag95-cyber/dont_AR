@@ -8,5 +8,5 @@ const fixedOrgs = POLLING_STATIONS.map(s => ({
 }));
 
 export default function Kolcentar() {
-  return <TurnoutTeamPage teamType="kolcentar" title="📞 Колцентар — Излазност по БМ" allowOrgManagement={false} fixedOrgs={fixedOrgs} />;
+  return <TurnoutTeamPage teamType="kolcentar" title="📞 Колцентар — Излазност по БМ" allowOrgManagement={false} fixedOrgs={fixedOrgs} showHistorical />;
 }

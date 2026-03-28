@@ -32,7 +32,7 @@ export default function IzlaznostLayout() {
             <NavLink to="/izlaznost/pregled" className={navLinkClass}>🏠 Преглед</NavLink>
 
             <div className="pt-3">
-              <p className={sectionHeader}>Каписларни глас</p>
+              <p className={sectionHeader}>КАПИЛАРНИ ГЛАС</p>
               {KSG_TEAMS.map(t => (
                 <NavLink key={t.key} to={t.path} className={navLinkClass}>
                   {t.label}
