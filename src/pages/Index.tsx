@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { ElectionData, Party, calculateDhondt, defaultElectionData } from "@/lib/dhondt";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
 import { useStationData } from "@/hooks/useStationData";
+import { ELECTION_2022 } from "@/lib/historical2022";
 import SummarySheet from "@/components/SummarySheet";
 import DhondtSheet from "@/components/DhondtSheet";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
