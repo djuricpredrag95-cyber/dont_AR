@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTurnoutOrganizations, useTurnoutEntries } from "@/hooks/useTurnoutData";
 import { HOURS } from "@/lib/turnoutConstants";
-import { HISTORICAL_TURNOUT } from "@/lib/historicalTurnout";
+import { HISTORICAL_TURNOUT, HISTORICAL_COMBINED_BMS } from "@/lib/historicalTurnout";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
