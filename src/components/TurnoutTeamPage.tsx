@@ -192,7 +192,9 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
                             </TableCell>
                           </TableRow>
                           <TableRow key={`${org.id}-2023`} className="bg-muted/30">
-                            <TableCell className="text-xs text-muted-foreground italic pl-8">↳ 2023</TableCell>
+                            <TableCell className="text-xs text-muted-foreground italic pl-8">
+                              ↳ 2023{HISTORICAL_COMBINED_BMS.has(org.id) ? " (стари БМ 13)" : ""}
+                            </TableCell>
                             {HOURS.map(h => {
                               const v = hist[h]?.y2023;
                               return (
