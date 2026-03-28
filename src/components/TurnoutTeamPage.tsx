@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useTurnoutOrganizations, useTurnoutEntries } from "@/hooks/useTurnoutData";
 import { HOURS } from "@/lib/turnoutConstants";
+import { HISTORICAL_TURNOUT } from "@/lib/historicalTurnout";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   teamType: string;
   title: string;
-  /** If true, orgs can be added/removed. If false, orgs are passed via fixedOrgs */
   allowOrgManagement?: boolean;
   fixedOrgs?: { id: number; name: string; target: number }[];
+  /** Show historical 2022/2023 data per org in table view */
+  showHistorical?: boolean;
 }
 
-export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = true, fixedOrgs }: Props) {
+export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = true, fixedOrgs, showHistorical = false }: Props) {
   const [tab, setTab] = useState<"entry" | "view">("entry");
   const { orgs: dynamicOrgs, addOrg, deleteOrg } = useTurnoutOrganizations(teamType);
   const { entries, saveEntry, getNextHour, getEntry } = useTurnoutEntries(teamType);
@@ -22,7 +24,6 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
 
-  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalOrg, setModalOrg] = useState<{ id: number; name: string } | null>(null);
   const [modalHour, setModalHour] = useState("");
@@ -52,6 +53,15 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
     setNewTarget("");
   };
 
+  // Get cumulative total (last filled hour value) for an org
+  const getOrgTotal = (orgId: number): number => {
+    const orgEntries = entries.filter(e => e.source_id === orgId);
+    if (orgEntries.length === 0) return 0;
+    const lastHour = [...HOURS].reverse().find(h => orgEntries.some(e => e.hour === h));
+    if (!lastHour) return 0;
+    return orgEntries.filter(e => e.hour === lastHour).reduce((s, e) => s + e.count, 0);
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -70,7 +80,6 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
 
       {tab === "entry" ? (
         <div className="space-y-4">
-          {/* Add org form */}
           {allowOrgManagement && (
             <div className="bg-card border rounded-xl p-4 flex items-end gap-3">
               <div className="flex-1">
@@ -92,7 +101,6 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
             </div>
           )}
 
-          {/* Org list */}
           <div className="bg-card border rounded-xl overflow-hidden">
             <div className="bg-muted px-5 py-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -133,7 +141,6 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
           </div>
         </div>
       ) : (
-        /* Преглед — table view */
         <div className="bg-card border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -148,23 +155,59 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
               </TableHeader>
               <TableBody>
                 {orgs.map(org => {
-                  const total = entries.filter(e => e.source_id === org.id).reduce((s, e) => s + e.count, 0);
+                  const total = getOrgTotal(org.id);
+                  const hist = showHistorical ? HISTORICAL_TURNOUT[org.id] : null;
                   return (
-                    <TableRow key={org.id}>
-                      <TableCell className="text-sm font-medium text-foreground whitespace-nowrap">{org.name}</TableCell>
-                      {HOURS.map(h => {
-                        const val = getEntry(org.id, h);
-                        return (
-                          <TableCell key={h} className="text-center font-mono text-sm">
-                            {val !== undefined ? val.toLocaleString("sr") : <span className="text-muted-foreground/30">—</span>}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell className="text-right font-mono text-sm font-semibold text-foreground">{total.toLocaleString("sr")}</TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow key={org.id}>
+                        <TableCell className="text-sm font-medium text-foreground whitespace-nowrap">{org.name}</TableCell>
+                        {HOURS.map(h => {
+                          const val = getEntry(org.id, h);
+                          return (
+                            <TableCell key={h} className="text-center font-mono text-sm">
+                              {val !== undefined ? val.toLocaleString("sr") : <span className="text-muted-foreground/30">—</span>}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right font-mono text-sm font-semibold text-foreground">
+                          {total > 0 ? total.toLocaleString("sr") : "—"}
+                        </TableCell>
+                      </TableRow>
+                      {hist && (
+                        <>
+                          <TableRow key={`${org.id}-2022`} className="bg-muted/30">
+                            <TableCell className="text-xs text-muted-foreground italic pl-8">↳ 2022</TableCell>
+                            {HOURS.map(h => {
+                              const v = hist[h]?.y2022;
+                              return (
+                                <TableCell key={h} className="text-center font-mono text-xs text-muted-foreground">
+                                  {v !== undefined ? v.toLocaleString("sr") : "—"}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                              {(hist["20:00"]?.y2022 ?? 0).toLocaleString("sr")}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow key={`${org.id}-2023`} className="bg-muted/30">
+                            <TableCell className="text-xs text-muted-foreground italic pl-8">↳ 2023</TableCell>
+                            {HOURS.map(h => {
+                              const v = hist[h]?.y2023;
+                              return (
+                                <TableCell key={h} className="text-center font-mono text-xs text-muted-foreground">
+                                  {v !== undefined ? v.toLocaleString("sr") : "—"}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                              {(hist["20:00"]?.y2023 ?? 0).toLocaleString("sr")}
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </>
                   );
                 })}
-                {/* Totals row */}
                 <TableRow className="bg-secondary font-semibold border-t-2">
                   <TableCell className="text-sm text-secondary-foreground">УКУПНО</TableCell>
                   {HOURS.map(h => {
@@ -176,7 +219,14 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
                     );
                   })}
                   <TableCell className="text-right font-mono text-sm text-secondary-foreground">
-                    {entries.reduce((s, e) => s + e.count, 0).toLocaleString("sr")}
+                    {(() => {
+                      const lastHourVal = [...HOURS].reverse().reduce((found, h) => {
+                        if (found > 0) return found;
+                        const t = entries.filter(e => e.hour === h).reduce((s, e) => s + e.count, 0);
+                        return t > 0 ? t : 0;
+                      }, 0);
+                      return lastHourVal > 0 ? lastHourVal.toLocaleString("sr") : "—";
+                    })()}
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -185,7 +235,6 @@ export default function TurnoutTeamPage({ teamType, title, allowOrgManagement = 
         </div>
       )}
 
-      {/* Entry modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

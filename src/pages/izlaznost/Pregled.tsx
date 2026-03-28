@@ -1,5 +1,6 @@
 import { useTurnoutEntries } from "@/hooks/useTurnoutData";
 import { HOURS, KSG_TEAMS } from "@/lib/turnoutConstants";
+import { getHistoricalHourTotal } from "@/lib/historicalTurnout";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 
 const SOURCES = [
@@ -10,9 +11,15 @@ const SOURCES = [
 ];
 
 function SourceRow({ label, types }: { label: string; types: string[] }) {
-  // Fetch all relevant source types and combine
   const allEntries = types.map(t => useTurnoutEntries(t));
   const entries = allEntries.flatMap(e => e.entries);
+
+  // "Укупно" = last filled hour's cumulative value (max across hours)
+  const lastHourValue = [...HOURS].reverse().reduce((found, h) => {
+    if (found > 0) return found;
+    const hourTotal = entries.filter(e => e.hour === h).reduce((s, e) => s + e.count, 0);
+    return hourTotal > 0 ? hourTotal : 0;
+  }, 0);
 
   return (
     <TableRow>
@@ -26,7 +33,26 @@ function SourceRow({ label, types }: { label: string; types: string[] }) {
         );
       })}
       <TableCell className="text-right font-mono text-sm font-semibold">
-        {entries.reduce((s, e) => s + e.count, 0).toLocaleString("sr")}
+        {lastHourValue > 0 ? lastHourValue.toLocaleString("sr") : "—"}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function HistoricalRow({ label, year }: { label: string; year: "y2022" | "y2023" }) {
+  return (
+    <TableRow className="bg-muted/50">
+      <TableCell className="text-sm font-medium text-muted-foreground italic">{label}</TableCell>
+      {HOURS.map(h => {
+        const total = getHistoricalHourTotal(h, year);
+        return (
+          <TableCell key={h} className="text-center font-mono text-sm text-muted-foreground">
+            {total > 0 ? total.toLocaleString("sr") : "—"}
+          </TableCell>
+        );
+      })}
+      <TableCell className="text-right font-mono text-sm font-semibold text-muted-foreground">
+        {getHistoricalHourTotal("20:00", year).toLocaleString("sr")}
       </TableCell>
     </TableRow>
   );
@@ -56,6 +82,8 @@ export default function Pregled() {
               {SOURCES.map(s => (
                 <SourceRow key={s.key} label={s.label} types={s.types} />
               ))}
+              <HistoricalRow label="📅 Излазност 2022." year="y2022" />
+              <HistoricalRow label="📅 Излазност 2023." year="y2023" />
             </TableBody>
           </Table>
         </div>

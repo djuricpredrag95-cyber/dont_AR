@@ -8,5 +8,5 @@ const fixedOrgs = POLLING_STATIONS.map(s => ({
 }));
 
 export default function Teren() {
-  return <TurnoutTeamPage teamType="teren" title="🗺️ Терен — Излазност по БМ" allowOrgManagement={false} fixedOrgs={fixedOrgs} />;
+  return <TurnoutTeamPage teamType="teren" title="🗺️ Терен — Излазност по БМ" allowOrgManagement={false} fixedOrgs={fixedOrgs} showHistorical />;
 }
