@@ -287,6 +287,24 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                     ))}
                     <TableCell className="text-center text-xs text-secondary-foreground">{aggregated.validCount} ✅</TableCell>
                     <TableCell></TableCell>
+                    {(() => {
+                      let totalVoted2022 = 0, totalSns2022 = 0;
+                      const seen = new Set<number>();
+                      POLLING_STATIONS.forEach(s => {
+                        const e = ELECTION_2022[s.id];
+                        if (!e) return;
+                        // Don't double-count BM 13+14 (same old data)
+                        if (s.id === 14) return;
+                        totalVoted2022 += e.totalVoted;
+                        totalSns2022 += e.snsVotes;
+                      });
+                      return (
+                        <>
+                          <TableCell className="text-right font-mono text-xs text-secondary-foreground">{totalVoted2022.toLocaleString("sr")}</TableCell>
+                          <TableCell className="text-right font-mono text-xs text-secondary-foreground">{totalSns2022.toLocaleString("sr")}</TableCell>
+                        </>
+                      );
+                    })()}
                   </TableRow>
                 </TableBody>
               </Table>
