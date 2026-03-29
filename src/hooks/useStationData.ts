@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStations";
 
@@ -42,11 +42,25 @@ export function useStationData() {
     setLoading(false);
   }, []);
 
-  // Initial fetch + poll every 5s
+  // Initial fetch + realtime subscription
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 5000);
-    return () => clearInterval(interval);
+
+    const channel = supabase
+      .channel("polling_station_results_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "polling_station_results" },
+        () => {
+          console.log("Realtime: polling_station_results changed, refetching...");
+          fetchAll();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchAll]);
 
   const saveStation = useCallback(async (stationData: PollingStationData) => {
