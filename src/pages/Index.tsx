@@ -217,9 +217,18 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                             <TableCell className="text-right font-mono text-sm text-foreground">{d.totalVoted.toLocaleString("sr")}</TableCell>
                             <TableCell className="text-right font-mono text-sm text-foreground">{d.totalInBox.toLocaleString("sr")}</TableCell>
                             <TableCell className="text-right font-mono text-sm text-foreground">{d.totalInvalid.toLocaleString("sr")}</TableCell>
-                            {d.partyVotes.map((v, i) => (
-                              <TableCell key={i} className="text-right font-mono text-sm text-foreground">{v.toLocaleString("sr")}</TableCell>
-                            ))}
+                            {(() => {
+                              const validVotes = d.partyVotes.reduce((a, b) => a + b, 0);
+                              return d.partyVotes.map((v, i) => {
+                                const pct = validVotes > 0 ? (v / validVotes * 100) : 0;
+                                return (
+                                  <TableCell key={i} className="text-right font-mono text-sm text-foreground">
+                                    {v.toLocaleString("sr")}
+                                    <div className="text-[10px] text-muted-foreground">{pct > 0 ? `${pct.toFixed(1)}%` : ""}</div>
+                                  </TableCell>
+                                );
+                              });
+                            })()}
                             <TableCell className="text-center">
                               <span className={`text-xs font-medium ${valid ? "text-green-600" : "text-destructive"}`}>
                                 {valid ? "✅" : "⚠️"}
