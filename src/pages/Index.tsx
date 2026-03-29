@@ -5,6 +5,13 @@ import { POLLING_STATIONS, PARTIES, PollingStationData } from "@/lib/pollingStat
 import { useStationData } from "@/hooks/useStationData";
 import { ELECTION_2022 } from "@/lib/historical2022";
 import SummarySheet from "@/components/SummarySheet";
+
+const UKUPNO_NASI: Record<number, number> = {
+  1:773,2:623,3:524,4:583,5:682,6:506,7:795,8:608,9:617,10:691,
+  11:656,12:549,13:359,14:497,15:335,16:580,17:841,18:781,19:515,20:512,
+  21:179,22:313,23:631,24:438,25:297,26:188,27:106,28:193,29:188,30:145,
+  31:437,32:364,33:603,34:322,35:262,36:418,37:336,38:461,39:215,40:720,41:114,
+};
 import DhondtSheet from "@/components/DhondtSheet";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 
