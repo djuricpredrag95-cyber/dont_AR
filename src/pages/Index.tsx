@@ -337,6 +337,9 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                         </>
                       );
                     })()}
+                    <TableCell className="text-right font-mono text-sm font-bold text-blue-600">
+                      {Object.values(UKUPNO_NASI).reduce((a, b) => a + b, 0).toLocaleString("sr")}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
