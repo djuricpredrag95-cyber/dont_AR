@@ -198,6 +198,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                     <TableHead className="text-xs font-semibold uppercase w-12"></TableHead>
                     <TableHead className="text-xs font-semibold uppercase text-right text-muted-foreground">2022 Гласали</TableHead>
                     <TableHead className="text-xs font-semibold uppercase text-right text-muted-foreground">2022 СНС</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-right text-blue-600">Укупно наши</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
