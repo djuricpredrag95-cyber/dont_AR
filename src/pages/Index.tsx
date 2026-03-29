@@ -291,9 +291,18 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                     <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalVoted.toLocaleString("sr")}</TableCell>
                     <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalInBox.toLocaleString("sr")}</TableCell>
                     <TableCell className="text-right font-mono text-sm text-secondary-foreground">{aggregated.totalInvalid.toLocaleString("sr")}</TableCell>
-                    {aggregated.partyTotals.map((t, i) => (
-                      <TableCell key={i} className="text-right font-mono text-sm text-secondary-foreground">{t.toLocaleString("sr")}</TableCell>
-                    ))}
+                    {(() => {
+                      const totalValid = aggregated.partyTotals.reduce((a, b) => a + b, 0);
+                      return aggregated.partyTotals.map((t, i) => {
+                        const pct = totalValid > 0 ? (t / totalValid * 100) : 0;
+                        return (
+                          <TableCell key={i} className="text-right font-mono text-sm text-secondary-foreground">
+                            {t.toLocaleString("sr")}
+                            <div className="text-[10px]">{pct > 0 ? `${pct.toFixed(1)}%` : ""}</div>
+                          </TableCell>
+                        );
+                      });
+                    })()}
                     <TableCell className="text-center text-xs text-secondary-foreground">{aggregated.validCount} ✅</TableCell>
                     <TableCell></TableCell>
                     {(() => {
