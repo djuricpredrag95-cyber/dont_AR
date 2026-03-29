@@ -290,6 +290,9 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
                                 </>
                               );
                             })()}
+                            <TableCell className="text-right font-mono text-sm font-semibold text-blue-600">
+                              {(UKUPNO_NASI[s.id] ?? 0).toLocaleString("sr")}
+                            </TableCell>
                           </>
                         )}
                       </TableRow>
